@@ -1,0 +1,85 @@
+#!groovy
+
+
+node('mac_mini') {
+
+    def buildTimestamp = sh(script: 'date +%Y%m%d%H%M%S%Z', returnStdout: true).replaceAll("\r", "").replaceAll("\n", "")
+
+    def dockerTagName =  "cloudsvn.chinacloudapp.cn:9082/hapzhishi/${MODULE_NAME}:${ENV_NAME}.1.0.0.${buildTimestamp}"
+
+
+    stage('checkout') {
+        checkout scm
+    }
+
+    stage('build') {
+        //dir("${MODULE_NAME}") {
+          //  sh "mvn clean package -DskipTests"
+            //sh "docker build -t ${dockerTagName} -f Dockerfile ./"
+        // }
+        sh "mvn clean package -DskipTests"
+        sh "docker build -t ${dockerTagName} -f Dockerfile ."
+    }
+
+    stage('push') {
+        docker.withRegistry("https://cloudsvn.chinacloudapp.cn:9082/", "29b4a8c5-07cc-4c6a-92fe-8f48c04e9de4") {
+            docker.image(dockerTagName).push()
+        }
+    }
+    stage('rm images') {
+        sh "docker rmi ${dockerTagName}"
+    }
+
+    stage('deploy') {
+        def config = sh(script: "curl -u 'E8E94B493E7C84DAFE52:6SYU48onLdVAqEjcQoRDUUb5rVLjjhfpW4jw9sCX' -X GET -H 'Content-Type: application/json, Accept: application/json' 'https://rancher.local.zhishinet.com/v2-beta/projects/${ENV_ID}/services/${SERVICE_ID}' | node rancherUpgradeGenerate.js ${dockerTagName}", returnStdout: true)
+        sh "curl -u 'E8E94B493E7C84DAFE52:6SYU48onLdVAqEjcQoRDUUb5rVLjjhfpW4jw9sCX' -X POST -H 'Content-Type: application/json' -H 'Accept: application/json' -d '{\"inServiceStrategy\": {\"launchConfig\": ${config}}, \"toServiceStrategy\":null}' 'https://rancher.local.zhishinet.com/v2-beta/projects/${ENV_ID}/services/${SERVICE_ID}?action=upgrade'"
+    }
+
+    stage('test') {
+//         def host = ''
+//         if("${ENV_NAME}" == 'dev'){
+//             host='dev.zhishinet.com'
+//         }else if("${ENV_NAME}" == 'test'){
+//             host='test.zhishinet.com'
+//         }else if("${ENV_NAME}" == 'stage') {
+//             host='staging.zhishinet.com'
+//         }else if("${ENV_NAME}" == 'prod'){
+// 			host='www.zhishinet.com'
+// 			MODULE_NAME = "Product-" + "${MODULE_NAME}"
+// 		}
+//         if(host != '') {
+//           checkout([$class: 'GitSCM',
+//                       branches: [[name: '*/master']],
+//                       doGenerateSubmoduleConfigurations: false,
+//                       extensions: [],
+//                       submoduleCfg: [],
+//                       userRemoteConfigs: [[credentialsId: '6fa5813e-4b61-44da-bf70-83958b59242c',
+//                                           depthOption: 'infinity',
+//                                           ignoreExternalsOption: true,
+//                                           local: 'ZhiShiNetInterfaceTest',
+//                                           url: 'https://git.zhishinet.com/zhishinet-test/InterfaceTest.git']],
+//                       workspaceUpdater: [$class: 'UpdateUpdater']
+//             ])
+
+//             sh 'cp /Users/handeducation/dev/apache-jmeter-3.2/extras/ant-jmeter-1.1.1.jar /Users/handeducation/dev/jenkins/tools/hudson.tasks.Ant_AntInstallation/ant/lib'
+
+//             sleep time: 5, unit: 'MINUTES'
+
+//             def anthome = tool 'ant'
+//             def JMETER_HOME="/Users/handeducation/dev/apache-jmeter-3.2"
+//             sh "${anthome}/bin/ant run -f ZhiShiNetTest/build.xml -Dhost=${host} -Dscriptname=${MODULE_NAME} -DJMETER_HOME=${JMETER_HOME}"
+
+//             sleep time: 10, unit: 'SECONDS'
+//             archiveArtifacts artifacts: 'ZhiShiNetTest/TestReport/html/*.html', fingerprint: true
+
+//             def title = "ZhiShiNet-InterfaceTest";
+//             //def mailList = "pan.jiang@hand-china.com weihua.qu@hand-china.com li.liu04@hand-china.com chengzhi.zhu@hand-china.com yancai.li@hand-china.com xiaofei.zhao@hand-china.com yi.zhang10@hand-china.com jiaojiao.li@hand-china.com hong.yuan01@hand-china.com min.peng@hand-china.com cc:jingqiang.jia@hand-china.com cc:junqiang.xiao@hand-china.com";
+//             checkout([$class: 'GitSCM', branches: [[name: '*/master']], doGenerateSubmoduleConfigurations: false, extensions: [], submoduleCfg: [], userRemoteConfigs: [[credentialsId: '9c7d6931-14da-4663-ae15-a06ec725193a', url: 'https://git.zhishinet.com/hzs/zhishinet-jenkinsfiles.git']]])
+//             sh 'cat mailList.txt'
+//             def mailList = readFile 'mailList.txt'
+
+//             def body = "<font size='4'/><font color='#FF0000'>(本邮件是程序自动下发的，请勿回复！)</font><br/><hr/>项目名称：ZhiShiNet-InterfaceTest <br/>构建环境：${host}<br/>测试模块：${MODULE_NAME}<br/>构建编号：$BUILD_NUMBER<br/>构建地址：<a href='$JOB_URL'>$JOB_URL</a><br/>构建日志地址：<a href='${BUILD_URL}console'>${BUILD_URL}console</a><br/>详细报告：请查看附件<br/>"
+//             emailext attachmentsPattern: 'ZhiShiNetTest/TestReport/html/*.html', body: "${body}", recipientProviders: [[$class: 'DevelopersRecipientProvider']], subject: "${title}", to: "${mailList}"
+//         }
+    }
+}
